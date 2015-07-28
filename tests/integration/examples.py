@@ -11,6 +11,12 @@ from pytest import yield_fixture as fixture
 from testing import run
 
 
+def stop_service_check(service, return_code=0):
+    p = Popen(('pgctl-2015', 'stop', service))
+    p.wait()
+    assert p.returncode == return_code
+
+
 class DescribeDateExample(object):
 
     @fixture
@@ -23,6 +29,8 @@ class DescribeDateExample(object):
         p.wait()
         assert p.returncode == 0
         assert os.path.isfile('now.date')
+
+        stop_service_check('date')
 
 
 class DescribeTailExample(object):
@@ -44,6 +52,8 @@ class DescribeTailExample(object):
         assert os.path.isfile('output')
         assert open('output').read() == test_string
 
+        stop_service_check('tail')
+
 
 class DescribeStart(object):
 
@@ -59,5 +69,28 @@ class DescribeStart(object):
         p.wait()
         assert p.returncode == 0
         p = Popen(('pgctl-2015', 'start', 'date'))
+        p.wait()
+        assert p.returncode == 0
+
+        stop_service_check('date')
+
+
+class DescribeStop(object):
+
+    def it_does_stop(self, in_example_dir):
+        p = Popen(('pgctl-2015', 'start', 'date'))
+        p.wait()
+        assert p.returncode == 0
+        p = Popen(('pgctl-2015', 'stop', 'date'))
+        p.wait()
+        assert p.returncode == 0
+
+        p = Popen(('svstat', 'playground/date'), stdout=PIPE, stderr=PIPE)
+        stdout, stderr = p.communicate()
+        assert stderr == ''
+        assert 'playground/date: down' in stdout
+
+    def it_is_successful_before_start(self, in_example_dir):
+        p = Popen(('pgctl-2015', 'stop', 'date'))
         p.wait()
         assert p.returncode == 0

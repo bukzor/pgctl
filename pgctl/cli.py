@@ -57,6 +57,13 @@ def svc(*args):
         raise NoSuchService(stderr)
 
 
+def stat(*args):
+    p = Popen(('svstat',) + tuple(args), stdout=PIPE, stderr=PIPE)
+    stdout, _ = p.communicate()
+
+    return stdout
+
+
 class PgctlApp(object):
 
     def __init__(self, config):
@@ -79,7 +86,13 @@ class PgctlApp(object):
                 return "No such playground service: '%s'" % self.service
 
     def stop(self):
-        print('Stopping:', self._config['services'])
+        with self.pgdir.as_cwd():
+            # TODO-TEST: it can stop multiple services at once
+            service = self._config['services'][0]
+            check_str = '{}: up'.format(service)
+            while check_str in stat(service):
+                svc('-d', service)
+            print('Stopping:', self._config['services'])
 
     def status(self):
         print('Status:', self._config['services'])
