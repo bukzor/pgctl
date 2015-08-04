@@ -13,7 +13,7 @@ def test_start(in_example_dir):
 
 
 def test_stop(in_example_dir):
-    assert main(['stop']) is None
+    assert main(['stop']) == "No such playground service: 'default'"
 
 
 def test_status(in_example_dir):

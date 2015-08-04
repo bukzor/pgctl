@@ -41,6 +41,7 @@ def idempotent_svscan(pgdir):
     try:
         with flock(pgdir):
             Popen(('svscan', pgdir), preexec_fn=close_fds)
+            # wait a tic for svscan to start doing its thing
             time.sleep(.1)  # TODO: fixit
     except Locked:
         return
@@ -58,7 +59,7 @@ def svc(*args):
 
 
 def stat(*args):
-    p = Popen(('svstat',) + tuple(args), stdout=PIPE, stderr=PIPE)
+    p = Popen(('svstat',) + tuple(args), stdout=PIPE)
     stdout, _ = p.communicate()
 
     return stdout
@@ -93,6 +94,17 @@ class PgctlApp(object):
             while check_str in stat(service):
                 svc('-d', service)
             print('Stopping:', self._config['services'])
+
+        return
+        idempotent_svscan(self.pgdir.strpath)
+        print('Stopping:', self._config['services'])
+        with self.pgdir.as_cwd():
+            check_str = '{}: up'.format(self.service)
+            while True:
+                status = stat(self.service)
+                if check_str not in stat:
+                    break
+                svc('-d', self.service)
 
     def status(self):
         print('Status:', self._config['services'])

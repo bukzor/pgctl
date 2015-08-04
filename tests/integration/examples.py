@@ -4,17 +4,12 @@ from __future__ import print_function
 from __future__ import unicode_literals
 
 import os
+from subprocess import check_call
 from subprocess import PIPE
 from subprocess import Popen
 
 from pytest import yield_fixture as fixture
 from testing import run
-
-
-def stop_service_check(service, return_code=0):
-    p = Popen(('pgctl-2015', 'stop', service))
-    p.wait()
-    assert p.returncode == return_code
 
 
 class DescribeDateExample(object):
@@ -30,7 +25,7 @@ class DescribeDateExample(object):
         assert p.returncode == 0
         assert os.path.isfile('now.date')
 
-        stop_service_check('date')
+        check_call(('pgctl-2015', 'stop', 'date'))
 
 
 class DescribeTailExample(object):
@@ -52,7 +47,7 @@ class DescribeTailExample(object):
         assert os.path.isfile('output')
         assert open('output').read() == test_string
 
-        stop_service_check('tail')
+        check_call(('pgctl-2015', 'stop', 'tail'))
 
 
 class DescribeStart(object):
@@ -65,28 +60,19 @@ class DescribeStart(object):
         assert p.returncode == 1
 
     def it_is_idempotent(self, in_example_dir):
-        p = Popen(('pgctl-2015', 'start', 'date'))
-        p.wait()
-        assert p.returncode == 0
-        p = Popen(('pgctl-2015', 'start', 'date'))
-        p.wait()
-        assert p.returncode == 0
-
-        stop_service_check('date')
+        check_call(('pgctl-2015', 'start', 'date'))
+        check_call(('pgctl-2015', 'start', 'date'))
+        check_call(('pgctl-2015', 'stop', 'date'))
 
 
 class DescribeStop(object):
 
     def it_does_stop(self, in_example_dir):
-        p = Popen(('pgctl-2015', 'start', 'date'))
-        p.wait()
-        assert p.returncode == 0
-        p = Popen(('pgctl-2015', 'stop', 'date'))
-        p.wait()
-        assert p.returncode == 0
+        check_call(('pgctl-2015', 'start', 'date'))
+        check_call(('pgctl-2015', 'stop', 'date'))
 
         p = Popen(('svstat', 'playground/date'), stdout=PIPE, stderr=PIPE)
-        stdout, stderr = p.communicate()
+        stdout, stderr = run(p)
         assert stderr == ''
         assert 'playground/date: down' in stdout
 
