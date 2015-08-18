@@ -1,0 +1,24 @@
+#!/bin/bash
+# When we're performing Continuous Integration we don't want to import source
+# from $PWD, so we can ensure our setup.py packaging actually works. There's no
+# good way to prevent python from adding $PWD to the sys.path, so we make an
+# empty temporrary directory and cd there.
+export TOP=$(dirname $(readlink -f $0))
+
+
+# only do the install steps if we're *actually* under CI
+if [ "$1" == install ]; then
+    sudo apt-get install daemontools
+    pip install --upgrade pip
+    pip install --upgrade -r requirements.d/CI.txt
+    pre-commit install --install-hooks
+    exit  0
+fi
+
+# some commands (pylint, pre-commit) only find their config $PWD is under $TOP
+export TMPDIR=$TOP/.tox/tmp
+mkdir -p $TMPDIR
+SCRATCH=$(mktemp -d)
+
+cd $SCRATCH
+exec $TOP/test
