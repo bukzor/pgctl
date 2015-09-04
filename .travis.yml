@@ -1,6 +1,4 @@
 language: python
-env:
-    - TOXENV=python
 python:
     # in order of most-valuable tests first
     - "2.7"
@@ -9,14 +7,8 @@ matrix:
     # notify a failed build as soon as anything fails
     fast_finish: true
 
-before_install:
-    # the travis default umask is 002, but ubuntu's is 022
-    - umask 022
-    - chmod -R g-w .
-    - export TOP=$PWD
-install: ./CI install
-script: ./CI
-after_success: coveralls
+install: ./CI/install
+script: ./CI/test
  
 # sudo:false gives us the new, faster cluster and enables caches for public repos
 # http://docs.travis-ci.com/user/workers/container-based-infrastructure/

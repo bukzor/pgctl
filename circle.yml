@@ -1,16 +1,16 @@
 dependencies:
     pre:
+        # circleci does some unhelpful virtualenv caching
+        - rm -rf ~/virtualenvs/venv-system
+        - virtualenv ~/virtualenvs/venv-system
         - sudo apt-get update
-    override: ./CI install
+    override: 
+        - ./CI/install
     cache_directories:
-        - "~/.pip"
-        - "~/.pre-commit"
-        - "~/.cache"
+        - ~/.pip
+        - ~/.pre-commit
+        - ~/.cache
 
 test:
-    environment:
-        TOP: $PWD 
-        SCRATCH: $(mktemp -d)
-    pwd: $SCRATCH
     override:
-        - $TOP/test
+        - ./CI/test
