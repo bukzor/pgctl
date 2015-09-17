@@ -5,12 +5,15 @@ from __future__ import unicode_literals
 from setuptools import find_packages
 from setuptools import setup
 
+from pgctl import __version__
+
 
 def main():
     setup(
         name=str('pgctl'),
         description='A tool to configure and manage developer playgrounds.',
-        version='0.0.2',
+        url='http://pgctl.readthedocs.org/en/latest/',
+        version=__version__,
         platforms='linux',
         classifiers=[
             'Programming Language :: Python :: 2.7',
@@ -21,6 +24,7 @@ def main():
             'argparse',
             'frozendict',
             'cached-property',
+            'py',
             'six',
         ],
         # FIXME: all tests still pass if you break this.
@@ -29,6 +33,9 @@ def main():
                 'pgctl-2015 = pgctl.cli:main',
             ],
         },
+
+        author='Buck Evan',
+        author_email='buck.2019@gmail.com',
     )
 
 

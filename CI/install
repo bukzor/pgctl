@@ -1,0 +1,9 @@
+#!/bin/sh
+set -eux
+
+echo PATH: $PATH
+which -a pip
+
+sudo apt-get install daemontools pv
+pip install --upgrade pip
+pip install -r requirements.d/test.txt

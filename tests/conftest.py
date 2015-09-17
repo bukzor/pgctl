@@ -6,10 +6,32 @@ from __future__ import unicode_literals
 import os
 import shutil
 
+import pytest
 from py._path.local import LocalPath as Path
 from pytest import yield_fixture as fixture
 
+from pgctl.cli import PgctlApp
+
 TOP = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+env_whitelist = (
+    'SELENIUM_LOGLEVEL',
+    'HOME',
+    'TERM',
+    'PATH',
+    # enables boot2docker:
+    'DOCKER_HOST',
+    'DOCKER_CERT_PATH',
+    'DOCKER_TLS_VERIFY',
+)
+
+
+@pytest.fixture(autouse=True)
+def fixed_environment_vars():
+    """This resets the environment for all tests so that we can test sauce labs and locally individually"""
+    for var in dict(os.environ):
+        if var not in env_whitelist:
+            del os.environ[var]
 
 
 @fixture
@@ -22,7 +44,10 @@ def in_example_dir(tmpdir, homedir, service_name):
     shutil.copytree(template_dir, tmpdir.strpath)
 
     with tmpdir.as_cwd():
-        yield tmpdir
+        try:
+            yield tmpdir
+        finally:
+            PgctlApp().stop()
 
 
 @fixture
@@ -50,9 +75,12 @@ def service_name():
 def wait4():
     """wait for all subprocesses to finish."""
     yield
+    i = 0
     try:
-        while True:
-            os.wait3(0)
+        while i < 1000:
+            os.wait3(os.WNOHANG)
+            i += 1  # we only hit this when tests are broken. pragma: no cover
+        raise AssertionError("there's a subprocess that's still running")
     except OSError as error:
         if error.errno == 10:  # no child processes
             return

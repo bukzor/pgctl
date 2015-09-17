@@ -7,99 +7,109 @@ import argparse
 import os
 import time
 from subprocess import MAXFD
-from subprocess import Popen
+from sys import stderr
 
 from cached_property import cached_property
 from frozendict import frozendict
 from py._path.local import LocalPath as Path
 
 from .config import Config
-from pgctl.daemontools import NoSuchService
-from pgctl.daemontools import svc
-from pgctl.daemontools import SvStat
-from pgctl.daemontools import svstat
-from pgctl.service import Service
+from .configsearch import search_parent_directories
+from .daemontools import NoSuchService
+from .daemontools import svc
+from .daemontools import SvStat
+from .daemontools import svstat
+from .errors import CircularAliases
+from .errors import NoPlayground
+from .errors import PgctlUserError
+from .functions import exec_
+from .functions import JSONEncoder
+from .functions import uniq
+from .service import Service
+from pgctl import __version__
 
 
 XDG_RUNTIME_DIR = os.environ.get('XDG_RUNTIME_DIR') or '~/.run'
+ALL_SERVICES = '(all services)'
 PGCTL_DEFAULTS = frozendict({
+    # TODO-DOC: config
+    # where do our services live?
     'pgdir': 'playground',
-    'pgconf': 'conf.yaml',
+    # where does pgdir live?
     'pghome': os.path.join(XDG_RUNTIME_DIR, 'pgctl'),
+    # which services are we acting on?
     'services': ('default',),
+    # how long do we wait for them to come down/up?
+    'wait_period': '2.0',
+    # what are the named groups of services?
+    'aliases': frozendict({
+        'default': (ALL_SERVICES,)
+    }),
 })
-
-
-def exec_(argv, env=None):  # pragma: no cover
-    """Wrapper to os.execv which runs any atexit handlers (for coverage's sake).
-    Like os.execv, this function never returns.
-    """
-    if env is None:
-        env = os.environ
-
-    # in python3, sys.exitfunc has gone away, and atexit._run_exitfuncs seems to be the only pubic-ish interface
-    #   https://hg.python.org/cpython/file/3.4/Modules/atexitmodule.c#l289
-    import atexit
-    atexit._run_exitfuncs()  # pylint:disable=protected-access
-
-    from os import execvpe, closerange
-    closerange(3, MAXFD)
-    execvpe(argv[0], argv, env)  # never returns
 
 
 class PgctlApp(object):
 
     def __init__(self, config=PGCTL_DEFAULTS):
-        self._config = config
+        self.pgconf = frozendict(config)
 
     def __call__(self):
+        """Run the app."""
+        # ensure no weird file descriptors are open.
+        os.closerange(3, MAXFD)
         # config guarantees this is set
-        command = self._config['command']
+        command = self.pgconf['command']
         # argparse guarantees this is an attribute
         command = getattr(self, command)
-        return command()
+        try:
+            result = command()
+        except PgctlUserError as error:
+            # we don't need or want a stack trace for user errors
+            result = str(error)
+
+        if isinstance(result, basestring):
+            return 'ERROR: ' + result
+        else:
+            return result
 
     def __change_state(self, opt, expected_state, xing, xed):
         """Changes the state of a supervised service using the svc command"""
-        import sys
-        print(xing, self.services_string, file=sys.stderr)
-        self.idempotent_supervise()
+        print(xing, self.service_names_string, file=stderr)
         with self.pgdir.as_cwd():
-            try:
-                while True:  # a poor man's do/while
+            while True:  # a poor man's do/while
+                try:
                     svc((opt,) + tuple(self.service_names))
-                    status_list = svstat(*self.service_names)
-                    if all(
-                            status.process is None and status.state == expected_state
-                            for status in status_list
-                    ):
-                        break
-                    else:
-                        time.sleep(.01)
-                print(xed, self.services_string, file=sys.stderr)
-            except NoSuchService:
-                return "No such playground service: '%s'" % self.services
+                except NoSuchService:
+                    raise NoSuchService("No such playground service: '%s'" % self.service_names_string)
+                status_list = svstat(*self.service_names)
+                if all(
+                        status.process is None and status.state == expected_state
+                        for status in status_list
+                ):
+                    break
+                else:
+                    time.sleep(.01)
+            print(xed, self.service_names_string, file=stderr)
 
     def start(self):
         """Idempotent start of a service or group of services"""
-        return self.__change_state('-u', 'up', 'Starting:', 'Started:')
+        for service in self.services:
+            service.background()
+        self.__change_state('-u', 'up', 'Starting:', 'Started:')
 
     def stop(self):
         """Idempotent stop of a service or group of services"""
-        return self.__change_state('-d', 'down', 'Stopping:', 'Stopped:')
-
-    def unsupervise(self):
-        return self.__change_state(
-            '-dx',
-            SvStat.UNSUPERVISED,
-            'Stopping supervise:',
-            'Stopped supervise:',
-        )
+        self.__change_state('-dx', SvStat.UNSUPERVISED, 'Stopping:', 'Stopped:')
+        for service in self.services:
+            service.check_stopped()
 
     def status(self):
         """Retrieve the PID and state of a service or group of services"""
         with self.pgdir.as_cwd():
             for status in svstat(*self.service_names):
+                if status.state == SvStat.UNSUPERVISED:
+                    # this is the expected state for down services.
+                    status = status._replace(state='down')
                 print(status)
 
     def restart(self):
@@ -109,37 +119,53 @@ class PgctlApp(object):
 
     def reload(self):
         """Reloads the configuration for a service"""
-        print('reload:', self._config['services'])
+        print('reload:', self.service_names_string, file=stderr)
+        return 'reloading is not yet implemented.'
 
     def log(self):
         """Displays the stdout and stderr for a service or group of services"""
-        print('Log:', self._config['services'])
+        # TODO(p3): -n: send the value to tail -n
+        # TODO(p3): -f: force iteractive behavior
+        # TODO(p3): -F: force iteractive behavior off
+        tail = ('tail', '--verbose')  # show file headers
+        import sys
+        if sys.stdout.isatty():
+            # we're interactive; give a continuous log
+            # TODO-TEST: pgctl log | pb should be non-interactive
+            tail += ('--follow=name', '--retry')
+
+        pwd = Path()
+        logfiles = []
+        for service in self.services:
+            service.ensure_directory_structure()
+            logfiles.append(service.path.join('stdout.log').relto(pwd))
+            logfiles.append(service.path.join('stderr.log').relto(pwd))
+        exec_(tail + tuple(logfiles))  # never returns
 
     def debug(self):
         """Allow a service to run in the foreground"""
-        if len(self.services) != 1:
+        try:
+            # start supervise in the foreground with the service up
+            service, = self.services  # pylint:disable=unpacking-non-sequence
+        except ValueError:
             return 'Must debug exactly one service, not: {0}'.format(
-                self.services_string,
+                self.service_names_string,
             )
 
-        self.unsupervise()
-
-        # start supervise in the foreground with the service up
-        service = self.services[0]
-        service.path.join('down').remove()
-        exec_(('supervise', service.path.strpath), env=service.supervise_env)  # pragma: no cover
+        self.stop()
+        service.foreground()  # never returns
 
     def config(self):
         """Print the configuration for a service"""
-        import json
-        print(json.dumps(self._config, sort_keys=True, indent=4))
+        print(JSONEncoder(sort_keys=True, indent=4).encode(self.pgconf))
 
     def service_by_name(self, service_name):
         """Return an instantiated Service, by name."""
         path = self.pgdir.join(service_name)
         return Service(
-            path=path,
-            scratch_dir=self.pghome.join(path.relto(str('/'))),
+            path,
+            self.pghome.join(path.relto(str('/'))),
+            self.pgconf['wait_period'],
         )
 
     @cached_property
@@ -148,65 +174,66 @@ class PgctlApp(object):
 
         :return: tuple of Service objects
         """
-        return sum(
-            tuple([
-                self.aliases.get(service_name, (self.service_by_name(service_name),))
-                for service_name in self._config['services']
-            ]),
-            (),
-        )
+        services = [
+            self.service_by_name(service_name)
+            for alias in self.pgconf['services']
+            for service_name in self._expand_aliases(alias)
+        ]
+        return uniq(services)
+
+    def _expand_aliases(self, name):
+        aliases = self.pgconf['aliases']
+        visited = set()
+        stack = [name]
+        result = []
+
+        while stack:
+            name = stack.pop()
+            if name == ALL_SERVICES:
+                result.extend(self.all_service_names)
+            elif name in visited:
+                raise CircularAliases("Circular aliases! Visited twice during alias expansion: '%s'" % name)
+            else:
+                visited.add(name)
+                if name in aliases:
+                    stack.extend(reversed(aliases[name]))
+                else:
+                    result.append(name)
+
+        return result
 
     @cached_property
-    def all_services(self):
+    def all_service_names(self):
         """Return a tuple of all of the Services.
 
-        :return: tuple of Service objects
+        :return: tuple of strings -- the service names
         """
-        return tuple(sorted(
-            self.service_by_name(service_path.basename)
-            for service_path in self.pgdir.listdir()
+        pgdir = self.pgdir.listdir(sort=True)
+
+        return tuple([
+            service_path.basename
+            for service_path in pgdir
             if service_path.check(dir=True)
-        ))
+        ])
 
     @cached_property
-    def aliases(self):
-        """A dictionary of aliases that can be expanded to services"""
-        ## for now don't worry about config file
-        return frozendict({
-            'default': self.all_services
-        })
-
-    def idempotent_supervise(self):
-        """
-        ensure all services are supervised starting in a down state
-        by contract, running this method repeatedly should have no negative consequences
-        """
-        for service in self.all_services:
-            service.ensure_correct_directory_structure()
-
-            # supervise is already essentially idempotent
-            # it dies with code 111 and a single line printed to stderr
-            Popen(
-                ('supervise', service.path.strpath),
-                stdout=service.path.join('stdout.log').open('w'),
-                stderr=service.path.join('stderr.log').open('w'),
-                env=service.supervise_env,
-                close_fds=True,
-            )  # pragma: no branch
-            # (see https://bitbucket.org/ned/coveragepy/issues/146)
-
-    @cached_property
-    def services_string(self):
+    def service_names_string(self):
         return ', '.join(self.service_names)
 
     @cached_property
     def service_names(self):
-        return [service.name for service in self.services]
+        return tuple([service.name for service in self.services])
 
     @cached_property
     def pgdir(self):
         """Retrieve the set playground directory"""
-        return Path(self._config['pgdir'])
+        for parent in search_parent_directories():
+            pgdir = Path(parent).join(self.pgconf['pgdir'])
+            if pgdir.check(dir=True):
+                return pgdir
+        raise NoPlayground(
+            "could not find any directory named '%s'" % self.pgconf['pgdir']
+        )
 
     @cached_property
     def pghome(self):
@@ -214,7 +241,7 @@ class PgctlApp(object):
 
         By default, this is "$XDG_RUNTIME_DIR/pgctl".
         """
-        return Path(self._config['pghome'], expanduser=True)
+        return Path(self.pgconf['pghome'], expanduser=True)
 
     commands = (start, stop, status, restart, reload, log, debug, config)
 
@@ -222,9 +249,9 @@ class PgctlApp(object):
 def parser():
     commands = [command.__name__ for command in PgctlApp.commands]
     parser = argparse.ArgumentParser()
+    parser.add_argument('--version', action='version', version=__version__)
     parser.add_argument('--pgdir', help='name the playground directory', default=argparse.SUPPRESS)
     parser.add_argument('--pghome', help='directory to keep user-level playground state', default=argparse.SUPPRESS)
-    parser.add_argument('--pgconf', help='name the playground config file', default=argparse.SUPPRESS)
     parser.add_argument('command', help='specify what action to take', choices=commands, default=argparse.SUPPRESS)
     parser.add_argument('services', nargs='*', help='specify which services to act upon', default=argparse.SUPPRESS)
 

@@ -1,4 +1,4 @@
-# pylint:disable=no-self-use
+# pylint:disable=no-self-use,unused-argument
 from __future__ import absolute_import
 from __future__ import unicode_literals
 
@@ -6,6 +6,7 @@ import os
 from contextlib import contextmanager
 
 import mock
+from testing import assert_command
 
 from pgctl.config import Config
 
@@ -45,7 +46,7 @@ apps_list =
 
 class DescribeCombined(object):
 
-    def it_combines_all_the_configs(self, tmpdir):
+    def it_combines_all_the_configs(self, tmpdir, fixed_environment_vars):
         config = Config('my', {'default': 'default'})
         with setup(tmpdir):
             conf = config.combined()
@@ -61,14 +62,9 @@ class DescribeCombined(object):
             'environs': ['1', '2', '3'],
         }
 
-    def it_can_be_run_via_python_m(self, tmpdir):
+    def it_can_be_run_via_python_m(self, tmpdir, fixed_environment_vars):
         from sys import executable
-        from subprocess import Popen, PIPE
-        with setup(tmpdir):
-            config = Popen((executable, '-m', 'pgctl.config', 'my'), stdout=PIPE)
-            config, _ = config.communicate()
-
-        assert config == '''\
+        expected_output = '''\
 {
     "app": "app", 
     "app/a": "app/a", 
@@ -88,3 +84,10 @@ class DescribeCombined(object):
     "home": "home"
 }
 '''  # noqa
+        with setup(tmpdir):
+            assert_command(
+                (executable, '-m', 'pgctl.config', 'my'),
+                expected_output,
+                '',
+                0,
+            )

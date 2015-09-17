@@ -1,3 +1,0 @@
-## the minimum set of packages that should be installed by travis
--r test.txt
-coveralls

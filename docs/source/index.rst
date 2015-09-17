@@ -8,9 +8,9 @@
 
 pgctl: the playground controller
 ================================
-`Issues <https://github.com/pypa/virtualenv/issues>`_ |
-`Github <https://github.com/pypa/virtualenv>`_
-.. TODO `PyPI <https://pypi.python.org/pypi/virtualenv/>`_ |
+`Issues <https://github.com/yelp/pgctl/issues>`_ |
+`Github <https://github.com/yelp/pgctl>`_ |
+`PyPI <https://pypi.python.org/pypi/pgctl/>`_
 
 Release v\ |version|. (:ref:`Installation <install>`)
 
@@ -56,23 +56,32 @@ Feature Support
   -  User-friendly Command Line Interface
   -  Simple Configuration
   -  Python 2.6—3.4
-  -  pypy and pypy3
 
 
 User Guide
 ----------
 
-This part of the documentation, which is mostly prose, begins with some
-background information about Requests, then focuses on step-by-step
-instructions for getting the most out of Requests.
+This part of the documentation covers the step-by-step
+instructions and usage of ``pgctl`` for getting started quickly.
 
 .. toctree::
    :maxdepth: 2
 
    user/install
-   user/usage
    user/quickstart
+   user/usage
    user/advanced
+
+Developer Guide
+---------------
+This part of the documentation gives an internal look at the design
+decisions for pgctl.
+
+.. toctree::
+   :maxdepth: 2
+
+   developer/design
+
 
 API Documentation
 -----------------
@@ -83,7 +92,7 @@ this part of the documentation is for you.
 .. toctree::
    :maxdepth: 2
 
-   api/pgctl
+   developer/api_doc
 
 
 Contributor Guide
