@@ -4,5 +4,6 @@ machine:
         TOXENV: python
 
 dependencies:
-    pre:
+    override:
         - ./CI/install/main
+        - tox --notest
