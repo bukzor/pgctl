@@ -2,6 +2,7 @@
 set -eu
 TOP=$(dirname $(dirname $(readlink -f $0)))
 TAG=localhost/ci-pgctl:$USER
+LOWCPU='--cpu-shares=2 --cpuset-cpus=0'
 
 if tty -s; then
     OPTS='-ti'
