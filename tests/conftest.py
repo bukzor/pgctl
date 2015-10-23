@@ -33,6 +33,19 @@ def in_example_dir(tmpdir, homedir, service_name):
                 PgctlApp().stop()
 
 
+def show_time(msg, outfile):
+    from datetime import datetime
+    outfile.write('\n\n%s: %s\n\n' % (msg, datetime.now().strftime('%F %T.%f')))
+
+
+@fixture(autouse=True, scope='session')
+def show_atexit():
+    tty = open('/dev/tty', 'w')
+    import atexit
+    atexit.register(lambda: show_time('atexit', tty))
+    yield
+
+
 @fixture
 def scratch_dir(pghome_dir, service_name, in_example_dir):
     yield pghome_dir.join(Path().join('playground', service_name).relto(str('/')))

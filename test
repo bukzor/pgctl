@@ -52,4 +52,5 @@ else
     COVERAGE_PROCESS_START= pre-commit run --no-stash
 fi
 py.test "$@"
+date '+%F %T.%N'
 combine
