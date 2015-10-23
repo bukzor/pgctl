@@ -57,6 +57,7 @@ def debug():
         fd = mytty.fileno()
         os.dup2(fd, 2)
 
+        # pylint:disable=import-error
         import pudb
         pudb.set_trace()
 
