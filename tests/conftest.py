@@ -33,16 +33,66 @@ def in_example_dir(tmpdir, homedir, service_name):
                 PgctlApp().stop()
 
 
-def show_time(msg, outfile):
+def debug():
+    from pgctl.flock import flock
+    with flock('debug.lock'):
+        import sys
+        tty = '/dev/pts/85'
+
+        #os.close(0)
+        mytty = open(tty)
+        sys.stdin = sys.__stdin__ = mytty
+        fd = mytty.fileno()
+        os.dup2(fd, 0)
+
+        #os.close(1)
+        mytty = open(tty, 'w')
+        sys.stdout = sys.__stdout__ = mytty
+        fd = mytty.fileno()
+        os.dup2(fd, 1)
+
+        #os.close(2)
+        mytty = open(tty, 'w')
+        sys.stderr = sys.__stderr__ = mytty
+        fd = mytty.fileno()
+        os.dup2(fd, 2)
+
+        import pudb
+        pudb.set_trace()
+
+
+def show_time(msg, outfile, tmpdir):
+    import sys
     from datetime import datetime
-    outfile.write('\n\n%s: %s\n\n' % (msg, datetime.now().strftime('%F %T.%f')))
+    import coverage.control
+    outfile.write(
+        '''
+
+%s: %s
+sys.gettrace: %s
+coverage.process_startup.done: %s
+argv: %s
+pid: %s
+tmpdir: %s
+
+'''
+        % (
+            msg,
+            datetime.now().strftime('%F %T.%f'),
+            sys.gettrace(),
+            coverage.control.process_startup.done,
+            sys.argv,
+            os.getpid(),
+            tmpdir,
+        )
+    )
 
 
 @fixture(autouse=True, scope='session')
-def show_atexit():
+def show_atexit(request):
     tty = open('/dev/tty', 'w')
     import atexit
-    atexit.register(lambda: show_time('atexit', tty))
+    atexit.register(lambda: show_time('atexit', tty, request.config.option.basetemp))
     yield
 
 
