@@ -7,7 +7,9 @@ export COVERAGE_DEBUG=config,dataio,dataop,pid
 export COVERAGE_DEBUG_FILE=$TOP/.coverage-debug
 
 combine() {
+    date '+%F %T.%N'
     $TOP/tests/testing/wait_for_files.py "$TOP/.coverage.*" 3
+    date '+%F %T.%N'
     unset COVERAGE_PROCESS_START
     coverage_bak="$TOP/coverage.bak.$(date "+%F_%T.%N")"
     mkdir $coverage_bak
@@ -52,5 +54,4 @@ else
     COVERAGE_PROCESS_START= pre-commit run --no-stash
 fi
 py.test "$@"
-date '+%F %T.%N'
 combine
