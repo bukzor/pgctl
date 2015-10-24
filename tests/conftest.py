@@ -69,12 +69,7 @@ def show_time(msg, outfile, tmpdir):
     outfile.write(
         '''
 
-%s: %s
-sys.gettrace: %s
-coverage.process_startup.done: %s
-argv: %s
-pid: %s
-tmpdir: %s
+%s:%s sys.gettrace:%s coverage.process_startup.done:%s argv:%s pid:%s tmpdir:%s
 
 '''
         % (

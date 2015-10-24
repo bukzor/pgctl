@@ -3,7 +3,7 @@ set -eu
 export TOP=$(dirname $(readlink -f $0))
 export PROJECT=pgctl
 export COVERAGE_PROCESS_START=$TOP/.coveragerc
-export COVERAGE_DEBUG=config,dataio,dataop,pid
+export COVERAGE_DEBUG=callers,config,dataio,dataop,pid,plugin,sys,trace
 export COVERAGE_DEBUG_FILE=$TOP/.coverage-debug
 
 combine() {
