@@ -145,4 +145,3 @@ This was the missing coverage. It correlates directly to the test run by "gw2".
     /home/ubuntu/pgctl/tests/unit/service.py                                               8      2      0      0    75%   12-13
     ------------------------------------------------------------------------------------------------------------------------------
     TOTAL                                                                               1806    246    261      9    87%   
-
