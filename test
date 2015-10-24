@@ -5,6 +5,7 @@ export PROJECT=pgctl
 export COVERAGE_PROCESS_START=$TOP/.coveragerc
 export COVERAGE_DEBUG=callers,config,dataio,dataop,pid,plugin,sys,trace
 export COVERAGE_DEBUG_FILE=$TOP/.coverage-debug
+export EXECNET_DEBUG=True
 
 combine() {
     date '+%F %T.%N'
