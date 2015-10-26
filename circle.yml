@@ -6,3 +6,5 @@ dependencies:
     override:
         - ./CI/install/main
         - tox --notest
+    cache_directories:
+        - ~/.cache
