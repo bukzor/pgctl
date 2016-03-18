@@ -68,12 +68,12 @@ class Service(namedtuple('Service', ['path', 'scratch_dir', 'default_timeout']))
         if not self.notification_fd.exists():
             # services without notification need to be considered ready sometimes
             if (
-                    # an 'up' service is always ready
-                    (result.state == 'up' and result.process is None) or
+                    # a running service is always ready
+                    (result.state == 'running' and result.want == 'up') or
                     # restarting continuously and successfully can/should be considered 'ready'
-                    (result.process == 'starting' and result.exitcode == 0 and result.seconds == 0)
+                    (result.want == 'up' and result.exitcode == 0 and result.seconds == 0)
             ):
-                result = result._replace(state='ready')
+                result = result._replace(state='up')
         trace('PARSED: %s', result)
         return result
 
@@ -109,10 +109,10 @@ class Service(namedtuple('Service', ['path', 'scratch_dir', 'default_timeout']))
         return self.__get_timeout('timeout-stop', self.default_timeout)
 
     @cached_property
-    def timeout_ready(self):
-        return self.__get_timeout('timeout-ready', self.default_timeout)
+    def timeout_start(self):
+        return self.__get_timeout('timeout-start', self.default_timeout)
 
-    def assert_stopped(self):
+    def assert_down(self):
         status = self.svstat()
         if status.state != SvStat.UNSUPERVISED:
             raise NotReady('its status is ' + str(status))
@@ -120,9 +120,9 @@ class Service(namedtuple('Service', ['path', 'scratch_dir', 'default_timeout']))
         with self.flock():
             return  # assertion success; nothing is running
 
-    def assert_ready(self):
+    def assert_up(self):
         status = self.svstat()
-        if status.state != 'ready':
+        if status.state != 'up':
             raise NotReady('its status is ' + str(status))
 
     def ensure_exists(self):

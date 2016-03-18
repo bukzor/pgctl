@@ -20,7 +20,7 @@ When you have a service that takes a while to stop, pgctl may incorrectly error 
 Services that start slowly
 --------------------------
 
-Similarly, if pgctl needs to be told to wait longer to start your service, write a ``timeout-ready`` file.
+Similarly, if pgctl needs to be told to wait longer to start your service, write a ``timeout-start`` file.
 
 If there's a significant period between when the service has started (up) and when it's actually doing it's job (ready),
 or if your service sometimes stops working even when it's running, create a runnable ``ready`` script in the service
@@ -37,7 +37,7 @@ the ``ready`` script repeatedly to determine when your service is actually ready
     $ cat playground/uwsgi/ready
     exec curl -s localhost:9003/status
 
-    $ cat playground/uwsgi/timeout-ready
+    $ cat playground/uwsgi/timeout-start
     30
 
 

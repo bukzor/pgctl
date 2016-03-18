@@ -256,11 +256,11 @@ class DescribeRestart(object):
 ''',
             0,
         )
-        assert_svstat('playground/sleep', state='up')
+        assert_svstat('playground/sleep', state='running')
 
     def it_also_works_when_up(self, in_example_dir):
         check_call(('pgctl-2015', 'start', 'sleep'))
-        assert_svstat('playground/sleep', state='up')
+        assert_svstat('playground/sleep', state='running')
 
         self.it_is_just_stop_then_start(in_example_dir)
 
@@ -274,20 +274,20 @@ class DescribeStartMultipleServices(object):
     def it_only_starts_the_indicated_services(self, in_example_dir, request):
         check_call(('pgctl-2015', 'start', 'sleep'))
 
-        assert_svstat('playground/sleep', state='up')
+        assert_svstat('playground/sleep', state='running')
         assert_svstat('playground/tail', state=SvStat.UNSUPERVISED)
 
     def it_starts_multiple_services(self, in_example_dir, request):
         check_call(('pgctl-2015', 'start', 'sleep', 'tail'))
 
-        assert_svstat('playground/sleep', state='up')
-        assert_svstat('playground/tail', state='up')
+        assert_svstat('playground/sleep', state='running')
+        assert_svstat('playground/tail', state='running')
 
     def it_stops_multiple_services(self, in_example_dir):
         check_call(('pgctl-2015', 'start', 'sleep', 'tail'))
 
-        assert_svstat('playground/sleep', state='up')
-        assert_svstat('playground/tail', state='up')
+        assert_svstat('playground/sleep', state='running')
+        assert_svstat('playground/tail', state='running')
 
         check_call(('pgctl-2015', 'stop', 'sleep', 'tail'))
 
@@ -297,8 +297,8 @@ class DescribeStartMultipleServices(object):
     def it_starts_everything_with_no_arguments_no_config(self, in_example_dir, request):
         check_call(('pgctl-2015', 'start'))
 
-        assert_svstat('playground/sleep', state='up')
-        assert_svstat('playground/tail', state='up')
+        assert_svstat('playground/sleep', state='running')
+        assert_svstat('playground/tail', state='running')
 
 
 class DescribeStatus(object):

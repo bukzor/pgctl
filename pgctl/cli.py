@@ -67,10 +67,10 @@ class start(StateChange):
         return self.service.start()
 
     def assert_(self):
-        return self.service.assert_ready()
+        return self.service.assert_up()
 
     def get_timeout(self):
-        return self.service.timeout_ready
+        return self.service.timeout_start
 
     class strings(object):
         change = 'start'
@@ -84,7 +84,7 @@ class stop(StateChange):
         return self.service.stop()
 
     def assert_(self):
-        return self.service.assert_stopped()
+        return self.service.assert_down()
 
     def get_timeout(self):
         return self.service.timeout_stop

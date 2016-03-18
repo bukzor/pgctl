@@ -29,7 +29,7 @@ def svc(args):
 
 
 class SvStat(
-        namedtuple('SvStat', ['state', 'pid', 'exitcode', 'seconds', 'process'])
+        namedtuple('SvStat', ['state', 'pid', 'exitcode', 'seconds', 'want'])
 ):
     __slots__ = ()
     UNSUPERVISED = 'could not get status, supervisor is down'
@@ -43,8 +43,8 @@ class SvStat(
             format += ' (exitcode {0.exitcode})'
         if self.seconds is not None:
             format += ' {0.seconds} seconds'
-        if self.process is not None:
-            format += ', {0.process}'
+        if self.want not in (None, self.state):
+            format += ', want {0.want}'
 
         return format.format(self)
 
@@ -87,25 +87,25 @@ def parse(string, start, divider, type=str):
 def svstat_parse(svstat_string):
     r'''
     >>> svstat_parse('up (pid 3714560) 13 seconds, normally down, ready 7 seconds\n')
-    ready (pid 3714560) 7 seconds
+    up (pid 3714560) 7 seconds
 
     >>> svstat_parse('up (pid 1202562) 100 seconds, ready 10 seconds\n')
-    ready (pid 1202562) 10 seconds
+    up (pid 1202562) 10 seconds
 
     >>> svstat_parse('up (pid 1202562) 100 seconds\n')
-    up (pid 1202562) 100 seconds
+    running (pid 1202562) 100 seconds, want up
 
     >>> svstat_parse('down 4334 seconds, normally up, want up')
-    down 4334 seconds, starting
+    down 4334 seconds, want up
 
     >>> svstat_parse('down (exitcode 0) 0 seconds, normally up, want up, ready 0 seconds')
-    down (exitcode 0) 0 seconds, starting
+    down (exitcode 0) 0 seconds, want up
 
     >>> svstat_parse('down 0 seconds, normally up')
     down 0 seconds
 
     >>> svstat_parse('up (pid 1202) 1 seconds, want down\n')
-    up (pid 1202) 1 seconds, stopping
+    running (pid 1202) 1 seconds, want down
 
     >>> svstat_parse('down 0 seconds, normally up')
     down 0 seconds
@@ -125,10 +125,10 @@ def svstat_parse(svstat_string):
     >>> svstat_parse('down (exitcode 0) 0 seconds, normally up, want wat, ready 0 seconds')
     Traceback (most recent call last):
         ...
-    ValueError: unexpected value for `process`: 'wat'
+    ValueError: unexpected value for `want`: 'wat'
 
     >>> svstat_parse('down (exitcode 0) 0 seconds, normally up, want up\x00, ready 0 seconds')
-    down (exitcode 0) 0 seconds, starting
+    down (exitcode 0) 0 seconds, want up
     '''
     status = svstat_string.strip()
     trace('RAW   : %s', status)
@@ -157,23 +157,23 @@ def svstat_parse(svstat_string):
     # we actually dont care about this value
     _, buffer = parse(buffer, 'normally ', ', ')
 
-    process, buffer = parse(buffer, 'want ', ', ')
-    if process is not None:
-        process = process.strip('\x00')  # s6 microbug
-        if process == 'up':
-            process = 'starting'
-        elif process == 'down':
-            process = 'stopping'
-        else:
-            raise ValueError("unexpected value for `process`: '%s'" % process)
+    want, buffer = parse(buffer, 'want ', ', ')
+    if want is None:
+        want = state
+    else:
+        want = want.strip('\x00')  # s6 microbug
+        if want not in ('up', 'down'):
+            raise ValueError("unexpected value for `want`: '%s'" % want)
 
     ready, buffer = parse(buffer, 'ready ', ' seconds', int)
-    if ready is not None and state == 'up':
-        state = 'ready'
-        seconds = ready
+    if state == 'up':
+        if ready is None:
+            state = 'running'
+        else:
+            seconds = ready
 
     assert buffer == '', (buffer, status)  # we parsed it all.
-    return SvStat(state, pid, exitcode, seconds, process)
+    return SvStat(state, pid, exitcode, seconds, want)
 
 
 def prepend_timestamps_to(logfile):

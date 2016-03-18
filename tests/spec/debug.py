@@ -66,7 +66,7 @@ def it_fails_with_multiple_services():
 @greeter_service
 def it_first_stops_the_background_service_if_running():
     check_call(('pgctl-2015', 'start', 'greeter'))
-    assert_svstat('playground/greeter', state='up')
+    assert_svstat('playground/greeter', state='running')
 
     assert_works_interactively()
 
@@ -78,7 +78,7 @@ def it_disables_polling_heartbeat():
         proc = Popen(('pgctl-2015', 'debug', 'slow-startup'), stdin=open(os.devnull), stdout=PIPE, stderr=PIPE)
 
     from testing.assertions import wait_for
-    wait_for(lambda: assert_svstat('playground/slow-startup', state='ready'))
+    wait_for(lambda: assert_svstat('playground/slow-startup', state='up'))
 
     check_call(('pgctl-2015', 'stop'))
     stdout, stderr = proc.communicate()

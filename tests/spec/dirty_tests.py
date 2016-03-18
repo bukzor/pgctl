@@ -183,7 +183,7 @@ class DescribeSlowShutdown(DirtyTest):
 
     def it_fails_by_default(self):
         check_call(('pgctl-2015', 'start'))
-        assert_svstat('playground/sweet', state='up')
+        assert_svstat('playground/sweet', state='running')
         assert_command(
             ('pgctl-2015', 'stop'),
             '',
@@ -205,10 +205,10 @@ class DescribeSlowShutdown(DirtyTest):
             timeout.write('3')
 
         check_call(('pgctl-2015', 'start'))
-        assert_svstat('playground/sweet', state='up')
+        assert_svstat('playground/sweet', state='running')
 
         check_call(('pgctl-2015', 'restart'))
-        assert_svstat('playground/sweet', state='up')
+        assert_svstat('playground/sweet', state='running')
 
         check_call(('pgctl-2015', 'stop'))
         assert_svstat('playground/sweet', state=SvStat.UNSUPERVISED)
